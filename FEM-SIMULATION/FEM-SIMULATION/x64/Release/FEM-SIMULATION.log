@@ -1,0 +1,19 @@
+﻿  fem.cpp
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(16,34): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(16,21): warning C4244: “初始化”: 从“double”转换到“const float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(17,33): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(17,26): warning C4244: “初始化”: 从“double”转换到“const float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(68,15): warning C4244: “初始化”: 从“const double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(68,38): warning C4244: “初始化”: 从“const double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(69,15): warning C4244: “初始化”: 从“const double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(69,38): warning C4244: “初始化”: 从“const double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(369,27): warning C4305: “初始化”: 从“double”到“float”截断
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(387,17): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(401,19): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+C:\Users\KMHuang\source\repos\FEM-SIMULATION\FEM-SIMULATION\fem.cpp(415,33): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据
+  正在生成代码
+  1 of 2623 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    12 functions had inline decision re-evaluated but remain unchanged
+  已完成代码的生成
+  FEM-SIMULATION.vcxproj -> C:\Users\KMHuang\source\repos\FEM-SIMULATION\x64\Release\FEM-SIMULATION.exe
