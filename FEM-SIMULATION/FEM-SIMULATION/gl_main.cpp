@@ -72,8 +72,7 @@ void display(void)
     draw_mesh();
 
     glFlush();
-    //fem_explicit();
-    //Projected_Newton_2DTest();
+
     //fem_explicit2D(mesh);
     //Projected_Newton2D(mesh);
     fem_implicit2D(mesh);

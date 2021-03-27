@@ -152,6 +152,7 @@
   <ItemGroup>
     <ClInclude Include="fem.h" />
     <ClInclude Include="fem_math.h" />
+    <ClInclude Include="fem_parameters.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="SVD.h" />
   </ItemGroup>
