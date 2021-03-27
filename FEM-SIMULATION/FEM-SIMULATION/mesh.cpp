@@ -47,3 +47,7 @@ void mesh2D::InitMesh(int type, double scale) {
 		vertexNum = cuboid.vertexNum;
 	}
 }
+
+void mesh3D::InitMesh(int type, double scale) {
+	 
+}

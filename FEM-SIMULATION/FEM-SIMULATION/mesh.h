@@ -86,5 +86,17 @@ public:
 	void InitMesh(int type, double scale);
 };
 
+class mesh3D {
+public:
+	vector<Vector3d> vertexes;
+	vector<vector<uint64_t>> tetrahedra;
+	vector<Vector3d> forces;
+	vector<Vector3d> velocities;
+	vector<Matrix3d> DM_triangle_inverse;
+	int vertexNum;
+	int tetrahedraNum;
+	void InitMesh(int type, double scale);
+};
+
 #endif // !FEM_MESH.H
 

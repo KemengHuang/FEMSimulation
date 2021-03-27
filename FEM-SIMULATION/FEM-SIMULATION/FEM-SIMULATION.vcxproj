@@ -143,14 +143,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="fem.cpp" />
+    <ClCompile Include="fem2D.cpp" />
+    <ClCompile Include="fem3D.cpp" />
     <ClCompile Include="fem_math.cpp" />
     <ClCompile Include="gl_main.cpp" />
     <ClCompile Include="mesh.cpp" />
     <ClCompile Include="SVD.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="fem.h" />
+    <ClInclude Include="fem2D.h" />
+    <ClInclude Include="fem3D.h" />
     <ClInclude Include="fem_math.h" />
     <ClInclude Include="fem_parameters.h" />
     <ClInclude Include="mesh.h" />

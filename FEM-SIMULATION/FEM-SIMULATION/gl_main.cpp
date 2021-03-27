@@ -2,13 +2,16 @@
 #include "GL\freeglut.h"
 
 #include <iostream>
-#include "fem.h"
+#include "fem2D.h"
+#include "fem3D.h"
 using namespace std;
 
-//mesh_circle mesh;
-mesh2D mesh;
+int s_dimention = 2;
 
-void draw_box(float ox, float oy, float width, float height)
+mesh2D mesh2d;
+mesh3D mesh3d;
+
+void draw_box2D(float ox, float oy, float width, float height)
 {
     glLineWidth(2.5f);
     glColor3f(0.8f, 0.8f, 0.8f);
@@ -30,59 +33,61 @@ void draw_box(float ox, float oy, float width, float height)
     glEnd();
 }
 
-void draw_mesh()
+void draw_mesh2D()
 {
     glLineWidth(1.5f);
     glColor3f(0.8f, 0.1f, 0.8f);
     glBegin(GL_LINES);
-    for (int i = 0; i < mesh.triangleNum; i++) {
+    for (int i = 0; i < mesh2d.triangleNum; i++) {
         //float a[] = { circle.vertex[circle.index[i][0]][0], circle.vertex[circle.index[i][0]][1], 0.0f };
         //float b[] = { circle.vertex[circle.index[i][1]][0], circle.vertex[circle.index[i][1]][1], 0.0f };
         //float c[] = { circle.vertex[circle.index[i][2]][0], circle.vertex[circle.index[i][2]][1], 0.0f };
         //glVertex2fv(a);
         //glVertex2fv(b);
         //glVertex2fv(c);
-        glVertex3f(mesh.vertexes[mesh.triangles[i][0]][0], mesh.vertexes[mesh.triangles[i][0]][1], 0.0f);
-        glVertex3f(mesh.vertexes[mesh.triangles[i][1]][0], mesh.vertexes[mesh.triangles[i][1]][1], 0.0f);
+        glVertex3f(mesh2d.vertexes[mesh2d.triangles[i][0]][0], mesh2d.vertexes[mesh2d.triangles[i][0]][1], 0.0f);
+        glVertex3f(mesh2d.vertexes[mesh2d.triangles[i][1]][0], mesh2d.vertexes[mesh2d.triangles[i][1]][1], 0.0f);
 
-        glVertex3f(mesh.vertexes[mesh.triangles[i][0]][0], mesh.vertexes[mesh.triangles[i][0]][1], 0.0f);
-        glVertex3f(mesh.vertexes[mesh.triangles[i][2]][0], mesh.vertexes[mesh.triangles[i][2]][1], 0.0f);
+        glVertex3f(mesh2d.vertexes[mesh2d.triangles[i][0]][0], mesh2d.vertexes[mesh2d.triangles[i][0]][1], 0.0f);
+        glVertex3f(mesh2d.vertexes[mesh2d.triangles[i][2]][0], mesh2d.vertexes[mesh2d.triangles[i][2]][1], 0.0f);
 
-        glVertex3f(mesh.vertexes[mesh.triangles[i][1]][0], mesh.vertexes[mesh.triangles[i][1]][1], 0.0f);
-        glVertex3f(mesh.vertexes[mesh.triangles[i][2]][0], mesh.vertexes[mesh.triangles[i][2]][1], 0.0f);
+        glVertex3f(mesh2d.vertexes[mesh2d.triangles[i][1]][0], mesh2d.vertexes[mesh2d.triangles[i][1]][1], 0.0f);
+        glVertex3f(mesh2d.vertexes[mesh2d.triangles[i][2]][0], mesh2d.vertexes[mesh2d.triangles[i][2]][1], 0.0f);
     }
     glEnd();
 }
 
+void draw_Scene2D() {
+    glClear(GL_COLOR_BUFFER_BIT);
+    draw_box2D(-1, -1, 2, 2);
+    draw_mesh2D();
+    glFlush();
+}
+
 void display(void)
 {
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    draw_box(-1, -1, 2, 2);
-    //glColor3f(1.0, 1.0, 0.0);
-    //glBegin(GL_TRIANGLES);
-    //glVertex3f(To.vertexs[0](0) / 5 - 0, To.vertexs[0](1) / 5 - 1, 0.0f);
-    //glVertex3f(To.vertexs[1](0) / 5 - 0, To.vertexs[1](1) / 5 - 1, 0.0f);
-    //glVertex3f(To.vertexs[2](0) / 5 - 0, To.vertexs[2](1) / 5 - 1, 0.0f);
-    //glColor3f(1.0, 1.0, 0.0);
-    //glVertex3f(Tc.vertexs[0](0) / 5 + 0, Tc.vertexs[0](1) / 5 + 0, 0.0f);
-    //glVertex3f(Tc.vertexs[1](0) / 5 + 0, Tc.vertexs[1](1) / 5 + 0, 0.0f);
-    //glVertex3f(Tc.vertexs[2](0) / 5 + 0, Tc.vertexs[2](1) / 5 + 0, 0.0f);
     
-    draw_mesh();
 
-    glFlush();
+    if (s_dimention == 2) {
+        draw_Scene2D();
+        fem_implicit2D(mesh2d);
+    }
+    else if (s_dimention == 3) {
 
-    //fem_explicit2D(mesh);
-    //Projected_Newton2D(mesh);
-    fem_implicit2D(mesh);
+    }
 }
 
 void init(void)
 {
     // select clearing color: purple
     glClearColor(0.0, 0.0, 0.0, 0.0);
-    initMesh(mesh, 1, 0.2);
+
+    if (s_dimention == 2) {
+        initMesh2D(mesh2d, 1, 0.2);
+    }
+    else if (s_dimention == 3) {
+        initMesh3D(mesh3d, 1, 0.2);
+    }
     // initialize viewing values
     //glMatrixMode(GL_PROJECTION);
     //glLoadIdentity();
