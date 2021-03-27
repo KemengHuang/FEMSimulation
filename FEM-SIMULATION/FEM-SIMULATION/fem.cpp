@@ -10,6 +10,7 @@ Matrix4d project_ARAP_H_2D(Matrix2d A) {
     Ve = svdResult.V;
 
     Matrix2d twist;
+
     twist << 0, -1, 1, 0;
     twist *= 1.f / sqrt(2.f);
     const MatrixXd e = vec_double(Ue * twist * Ve.transpose());
@@ -20,6 +21,102 @@ Matrix4d project_ARAP_H_2D(Matrix2d A) {
     H.setIdentity();
     H -= filtered * (e * e.transpose());
     H *= 2.0;
+    return H;
+}
+
+Matrix4d project_ANIOSI5_H_2D(Matrix2d F, Vector2d direction, double scale) {
+    direction.normalize();
+    SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
+    Matrix2d U, sigma, V, S;
+    U = svdResult.U;
+    sigma = svdResult.SIGMA;
+    V = svdResult.V;
+
+    S = V * sigma * V.transpose();
+    double I4 = direction.transpose() * S * direction;
+    double I5 = direction.transpose() * S.transpose() * S * direction;
+
+    if (abs(I5) < 1e-10) return MatrixXd::Zero(4, 4);
+
+    double s = 0;
+    if (I4 < 0) {
+        s = -1;
+    }
+    else if (I4 > 0) {
+        s = 1;
+    }
+
+    double lamda0 = scale;
+    double lamda1 = scale * (1 - s / sqrt(I5));
+    //double lamda2 = lamda1;
+    Matrix2d Q0, Q1, A;
+    A = direction * direction.transpose();
+    Q0 = (1 / sqrt(I5)) * F * A;
+    
+    Matrix2d twist;
+    twist << 0, -1, 1, 0;
+    twist *= 1.f / sqrt(2.f);
+    Q1 = U * twist * sigma * V.transpose() * A;
+
+    Matrix4d H = lamda0 * vec_double(Q0) * vec_double(Q0).transpose();
+    if (lamda1 >= 0) {
+        H += lamda1 * vec_double(Q1) * vec_double(Q1).transpose();
+    }
+
+    return H;
+}
+
+Matrix4d project_StabbleNHK_H_2D(Matrix2d F) {
+    SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
+    Matrix2d U, sigma, V, A;
+    U = svdResult.U;
+    sigma = svdResult.SIGMA;
+    V = svdResult.V;
+
+    double u = 0.3, r = 0.7;
+    A.setZero();
+    A(0, 0) = u;
+    A(1, 1) = u;
+
+    double lamda0 = A.eigenvalues()(0).real();
+    double lamda1 = A.eigenvalues()(1).real();
+
+    Matrix2d D0, D1;
+    D0 << 1, 0, 0, 0;
+    D1 << 0, 0, 0, 1;
+
+    D0 = U * D0 * V.transpose();
+    D1 = U * D1 * V.transpose();
+
+    double z0 = sigma(1, 1) * lamda0;
+    double z1 = sigma(0, 0) * lamda0;
+
+    Matrix2d Q0 = z0 * D0 + z1 * D1;
+
+    z0 = sigma(1, 1) * lamda1;
+    z1 = sigma(0, 0) * lamda1;
+
+    Matrix2d Q1 = z0 * D0 + z1 * D1;
+
+    Matrix4d H;
+    H.setZero();
+    H += lamda0 * vec_double(Q0) * vec_double(Q0).transpose();
+    H += lamda1 * vec_double(Q1) * vec_double(Q1).transpose();
+
+    Matrix2d twist0, twist1;
+    twist0 << 0, -1, 1, 0;
+    twist1 << 0, 1, 1, 0;
+    twist0 *= 1.f / sqrt(2.f);
+    twist1 *= 1.f / sqrt(2.f);
+    twist0 = U * twist0 * V.transpose();
+    twist1 = U * twist1 * V.transpose();
+
+    double lamda2 = u;
+    double lamda3 = u;
+
+    H += lamda2 * vec_double(twist0) * vec_double(twist0).transpose();
+    H += lamda3 * vec_double(twist1) * vec_double(twist1).transpose();
+    //cout << H << endl;
     return H;
 }
 
@@ -75,7 +172,7 @@ MatrixXd computePFPX2D_double(const Matrix2d& InverseDm) {
     return PFPX;
 }
 
-Matrix2d computePEPX_ARAP2D_double(const Matrix2d& F) {
+Matrix2d computePEPF_ARAP2D_double(const Matrix2d& F) {
     SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
     Matrix2d U, V, R;
     U = svdResult.U;
@@ -85,7 +182,7 @@ Matrix2d computePEPX_ARAP2D_double(const Matrix2d& F) {
     return PEPF;
 }
 
-Matrix2d computePEPX_StableNHK_double(const Matrix2d& F) {
+Matrix2d computePEPF_StableNHK_double(const Matrix2d& F) {
     SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
     Matrix2d U, V, R, S, sigma;
     //U = svdResult.U;
@@ -102,11 +199,11 @@ Matrix2d computePEPX_StableNHK_double(const Matrix2d& F) {
     return PEPF;
 }
 
-Matrix2d computePEPX_Aniostropic_double(const Matrix2d& F, Vector2d direction, const double& scale) {
+Matrix2d computePEPF_Aniostropic_double(const Matrix2d& F, Vector2d direction, const double& scale) {
     //double x = 0, y = 1;
-    double rate = sqrt(direction[0] * direction[0] + direction[1] * direction[1]);
-    direction /= rate;
-
+    //double rate = sqrt(direction[0] * direction[0] + direction[1] * direction[1]);
+    //direction /= rate;
+    direction.normalize();
     SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
     Matrix2d U, V, R, S, sigma;
     //U = svdResult.U;
@@ -138,8 +235,10 @@ void fem_explicit2D(mesh2D& mesh) {
         //cout << "F:\n" << F << endl;
         Matrix2d PEPF; PEPF.setZero();
         //Matrix2d PEPF = computePEPX_ARAP2D_double(F);
-        PEPF += computePEPX_StableNHK_double(F);
-        PEPF += computePEPX_Aniostropic_double(F, Vector2d(1, 0), 1);
+        project_StabbleNHK_H_2D(F);
+
+        PEPF += computePEPF_StableNHK_double(F);
+        PEPF += computePEPF_Aniostropic_double(F, Vector2d(1, 1), 1);
         //PEPF += computePEPX_Aniostropic_double(F, Vector2d(1, 0), 0.3);
         //cout << "PEPF:\n" << PEPF << endl;
         MatrixXd pepf = vec_double(PEPF);
@@ -246,7 +345,7 @@ void Projected_Newton2D(mesh2D& mesh) {
         MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
         //cout << "F:\n" << F << endl;
-        Matrix2d PEPF = computePEPX_ARAP2D_double(F);
+        Matrix2d PEPF = computePEPF_StableNHK_double(F);
 
         //cout << "PEPF:\n" << PEPF << endl;
         MatrixXd pepf = vec_double(PEPF);
@@ -267,7 +366,7 @@ void Projected_Newton2D(mesh2D& mesh) {
         mesh.forces[mesh.triangles[ii][2]][1] += f(5, 0);
 
         //Init Precondition Matrix
-        Matrix4d Hq = project_ARAP_H_2D(F);
+        Matrix4d Hq = project_StabbleNHK_H_2D(F);
         MatrixXd H = PFPX.transpose() * Hq * PFPX;
 
         //cout << "H:\n" << H << endl;
@@ -319,7 +418,7 @@ void Projected_Newton2D(mesh2D& mesh) {
         for (int ii = 0; ii < mesh.triangleNum; ii++) {
             MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
             MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
-            Matrix4d Hq = project_ARAP_H_2D(F);
+            Matrix4d Hq = project_StabbleNHK_H_2D(F);
             MatrixXd H = PFPX.transpose() * Hq * PFPX;
             VectorXd tempC(6);
             tempC(0) = c[mesh.triangles[ii][0]][0];
@@ -366,13 +465,209 @@ void Projected_Newton2D(mesh2D& mesh) {
         }
     }
 
-    float stepSize = 0.001;
+    float stepSize = 0.01;
     for (int i = 0; i < mesh.vertexNum; i++) {
         mesh.vertexes[i][0] -= dX[i][0] * stepSize;
         mesh.vertexes[i][1] -= dX[i][1] * stepSize;
     }
 }
 
+
+void fem_implicit2D(mesh2D& mesh) {
+    double time_step = 0.01;
+    double mass = 0.05;
+    Vector2d direction = Vector2d(1, 0);
+    double aniosScale = 1;
+    VectorXd P(mesh.vertexNum * 2), b0(mesh.vertexNum * 2);
+    P.setZero(); b0.setZero();
+    for (int ii = 0; ii < mesh.triangleNum; ii++) {
+        MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
+        MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
+        //cout << "F:\n" << F << endl;
+        Matrix2d PEPF = computePEPF_StableNHK_double(F);
+        PEPF += computePEPF_Aniostropic_double(F, direction, aniosScale);
+        //cout << "PEPF:\n" << PEPF << endl;
+        MatrixXd pepf = vec_double(PEPF);
+        /*cout << "pepf:\n" << pepf << endl;
+        cout << "PFPX:\n" << PFPX << endl;*/
+        MatrixXd f = -PFPX.transpose() * pepf;
+        //cout << "f:\n" << f << endl;
+        //for (int i = 0; i < f.rows(); i++) {
+        //    if (abs(f(i, 0)) < 1e-10) f(i, 0) = 0;
+        //}
+
+        //compute the b for formula: Ax = b
+        b0[mesh.triangles[ii][0] * 2] += f(0, 0) * time_step;
+        b0[mesh.triangles[ii][0] * 2 + 1] += f(1, 0) * time_step;
+        b0[mesh.triangles[ii][1] * 2] += f(2, 0) * time_step;
+        b0[mesh.triangles[ii][1] * 2 + 1] += f(3, 0) * time_step;
+        b0[mesh.triangles[ii][2] * 2] += f(4, 0) * time_step;
+        b0[mesh.triangles[ii][2] * 2 + 1] += f(5, 0) * time_step;
+
+        //Init Precondition Matrix
+        Matrix4d Hq = project_StabbleNHK_H_2D(F);
+        Hq += project_ANIOSI5_H_2D(F, direction, aniosScale);
+        MatrixXd H = -PFPX.transpose() * Hq * PFPX;
+
+
+        VectorXd tempC(6);
+        tempC(0) = mesh.velocities[mesh.triangles[ii][0]][0];
+        tempC(1) = mesh.velocities[mesh.triangles[ii][0]][1];
+        tempC(2) = mesh.velocities[mesh.triangles[ii][1]][0];
+        tempC(3) = mesh.velocities[mesh.triangles[ii][1]][1];
+        tempC(4) = mesh.velocities[mesh.triangles[ii][2]][0];
+        tempC(5) = mesh.velocities[mesh.triangles[ii][2]][1];
+
+        VectorXd tempQ = time_step * time_step * H * tempC;
+        b0[mesh.triangles[ii][0] * 2] += tempQ(0);
+        b0[mesh.triangles[ii][0] * 2 + 1] += tempQ(1);
+        b0[mesh.triangles[ii][1] * 2] += tempQ(2);
+        b0[mesh.triangles[ii][1] * 2 + 1] += tempQ(3);
+        b0[mesh.triangles[ii][2] * 2] += tempQ(4);
+        b0[mesh.triangles[ii][2] * 2 + 1] += tempQ(5);
+        //cout << "H:\n" << H << endl;
+
+        //double threshold = 1e-10;
+        P(mesh.triangles[ii][0] * 2) += mass - time_step * time_step * H(0, 0);
+        P(mesh.triangles[ii][0] * 2 + 1) += mass - time_step * time_step * H(1, 1);
+        P(mesh.triangles[ii][1] * 2) += mass - time_step * time_step * H(2, 2);
+        P(mesh.triangles[ii][1] * 2 + 1) += mass - time_step * time_step * H(3, 3);
+        P(mesh.triangles[ii][2] * 2) += mass - time_step * time_step * H(4, 4);
+        P(mesh.triangles[ii][2] * 2 + 1) += mass - time_step * time_step * H(5, 5);
+    }
+    //cout << "P\n" << P << endl;
+    double delta0 = 0;
+    double deltaO = 0;
+    double deltaN = 0;
+    vector<Vector2d> r(mesh.vertexNum, Vector2d(0, 0));
+    vector<Vector2d> c(mesh.vertexNum, Vector2d(0, 0));
+    vector<Vector2d> dV(mesh.vertexNum, Vector2d(0, 0));
+    //double r[9][2];
+    //double c[9][2];
+    //double dX[9][2] = { 0 };
+    for (int i = 0; i < mesh.vertexNum; i++) {
+        //compute delta0
+        double vx = abs(P(i * 2)) > 1e-5 ? 1 / P(i * 2) : 1;
+        double vy = abs(P(i * 2) + 1) > 1e-5 ? 1 / P(i * 2 + 1) : 1;
+        delta0 += b0[i * 2] * b0[i * 2] * vx;
+        delta0 += b0[i * 2 + 1] * b0[i * 2 + 1] * vy;
+
+        //init r
+        r[i][0] = b0[i * 2];
+        r[i][1] = b0[i * 2 + 1];
+
+        //mesh.forces[i][0] = 0;
+        //mesh.forces[i][1] = 0;
+        //init c
+        c[i][0] = r[i][0] * P(i * 2);
+        c[i][1] = r[i][1] * P(i * 2 + 1);
+
+        deltaN += c[i][0] * r[i][0];
+        deltaN += c[i][1] * r[i][1];
+    }
+
+    double errorRate = 0.001;
+
+    //PCG main loop
+    while (deltaN > errorRate* errorRate* delta0) {
+        vector<Vector2d> q(mesh.vertexNum, Vector2d(0, 0));
+        for (int ii = 0; ii < mesh.triangleNum; ii++) {
+            MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
+            MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
+            Matrix4d Hq = project_StabbleNHK_H_2D(F);
+            Hq += project_ANIOSI5_H_2D(F, direction, aniosScale);
+            MatrixXd H = -PFPX.transpose() * Hq * PFPX;
+            MatrixXd M(6, 6);// = mass * MatrixXd
+            M.setIdentity();
+            M = mass * M;
+            MatrixXd A = M - time_step * time_step * H;
+            VectorXd tempC(6);
+            tempC(0) = c[mesh.triangles[ii][0]][0];
+            tempC(1) = c[mesh.triangles[ii][0]][1];
+            tempC(2) = c[mesh.triangles[ii][1]][0];
+            tempC(3) = c[mesh.triangles[ii][1]][1];
+            tempC(4) = c[mesh.triangles[ii][2]][0];
+            tempC(5) = c[mesh.triangles[ii][2]][1];
+            VectorXd tempQ = A * tempC;
+            q[mesh.triangles[ii][0]][0] += tempQ(0);
+            q[mesh.triangles[ii][0]][1] += tempQ(1);
+            q[mesh.triangles[ii][1]][0] += tempQ(2);
+            q[mesh.triangles[ii][1]][1] += tempQ(3);
+            q[mesh.triangles[ii][2]][0] += tempQ(4);
+            q[mesh.triangles[ii][2]][1] += tempQ(5);
+        }
+
+        double tempSum = 0;
+        for (int i = 0; i < mesh.vertexNum; i++) {
+            tempSum += (c[i][0] * q[i][0] + c[i][1] * q[i][1]);
+        }
+        double alpha = deltaN / tempSum;
+
+        deltaO = deltaN;
+        deltaN = 0;
+        vector<Vector2d> s(mesh.vertexNum, Vector2d(0, 0));
+        for (int i = 0; i < mesh.vertexNum; i++) {
+            dV[i][0] = dV[i][0] + alpha * c[i][0];
+            dV[i][1] = dV[i][1] + alpha * c[i][1];
+
+            r[i][0] = r[i][0] - alpha * q[i][0];
+            r[i][1] = r[i][1] - alpha * q[i][1];
+
+            s[i][0] = r[i][0] * P(i * 2);
+            s[i][1] = r[i][1] * P(i * 2 + 1);
+
+            deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1]);
+        }
+
+
+        for (int i = 0; i < mesh.vertexNum; i++) {
+            c[i][0] = s[i][0] + (deltaN / deltaO) * c[i][0];
+            c[i][1] = s[i][1] + (deltaN / deltaO) * c[i][1];
+        }
+    }
+
+    double gravity = -9.8;
+    for (int ii = 0; ii < mesh.vertexNum; ii++) {
+        mesh.velocities[ii][0] += dV[ii][0];
+        mesh.velocities[ii][1] += dV[ii][1] + gravity * time_step;
+
+
+        mesh.velocities[2][1] = 0;
+        mesh.velocities[3][1] = 0;
+        mesh.velocities[4][1] = 0;
+        mesh.velocities[2][0] = 0;
+        mesh.velocities[3][0] = 0;
+        mesh.velocities[4][0] = 0;
+
+
+        mesh.velocities[12][1] = 0;
+        mesh.velocities[13][1] = 0;
+        mesh.velocities[14][1] = 0;
+        mesh.velocities[12][0] = 0;
+        mesh.velocities[13][0] = 0;
+        mesh.velocities[14][0] = 0;
+
+        mesh.vertexes[ii][0] += mesh.velocities[ii][0] * time_step;
+        mesh.vertexes[ii][1] += mesh.velocities[ii][1] * time_step;
+
+        if (mesh.vertexes[ii][1] < -1) {
+            mesh.vertexes[ii][1] = -1; mesh.velocities[ii][1] *= -0.1;
+        }
+
+        if (mesh.vertexes[ii][0] < -1) {
+            mesh.vertexes[ii][0] = -1; mesh.velocities[ii][0] *= -0.1;
+        }
+
+        if (mesh.vertexes[ii][1] > 1) {
+            mesh.vertexes[ii][1] = 1; mesh.velocities[ii][1] *= -0.1;
+        }
+
+        if (mesh.vertexes[ii][0] > 1) {
+            mesh.vertexes[ii][0] = 1; mesh.velocities[ii][0] *= -0.1;
+        }
+
+    }
+}
 
 void PCG_Test() {
     Matrix3d A, P;

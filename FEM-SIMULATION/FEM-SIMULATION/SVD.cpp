@@ -6,7 +6,6 @@ SVDResult2D_double SingularValueDecomposition2D_double(Matrix2d F)
     SVDResult2D_double result;
     Matrix2d tempU = svd.matrixU();
     Matrix2d tempV = svd.matrixV();
-
     Vector2d singVals = svd.singularValues();
     Matrix2d tempSigma = Matrix2d::Zero();
     tempSigma(0, 0) = singVals(0);
