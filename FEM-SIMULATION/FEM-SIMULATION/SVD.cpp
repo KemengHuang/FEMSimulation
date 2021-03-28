@@ -47,21 +47,27 @@ SVDResult3D_float SingularValueDecomposition3D_float(Matrix3f F)
     tempSigma(1, 1) = singVals(1);
     tempSigma(2, 2) = singVals(2);
 
-    if (tempU.determinant() < 0)
+    if (tempU.determinant() < 0 && tempV.determinant() > 0)
     {
         tempU(0, 2) *= -1;
         tempU(1, 2) *= -1;
         tempU(2, 2) *= -1;
         tempSigma(2, 2) *= -1;
     }
-
-    if (tempV.determinant() < 0)
+    else if (tempV.determinant() < 0 && tempU.determinant() > 0)
     {
         tempV(0, 2) *= -1;
         tempV(1, 2) *= -1;
         tempV(2, 2) *= -1;
         tempSigma(2, 2) *= -1;
     }
+
+    //if (tempSigma(0, 0) < tempSigma(1, 1))
+    //{
+    //    float tempRecord = tempSigma(0, 0);
+    //    tempSigma(0, 0) = tempSigma(1, 1);
+    //    tempSigma(1, 1) = tempRecord;
+    //}
 
     result.U = tempU;
     result.V = tempV;
@@ -83,21 +89,27 @@ SVDResult3D_double SingularValueDecomposition3D_double(Matrix3d F)
     tempSigma(1, 1) = singVals(1);
     tempSigma(2, 2) = singVals(2);
 
-    if (tempU.determinant() < 0)
+    if (tempU.determinant() < 0 && tempV.determinant() > 0)
     {
         tempU(0, 2) *= -1;
         tempU(1, 2) *= -1;
         tempU(2, 2) *= -1;
         tempSigma(2, 2) *= -1;
     }
-
-    if (tempV.determinant() < 0)
+    else if (tempV.determinant() < 0 && tempU.determinant() > 0)
     {
         tempV(0, 2) *= -1;
         tempV(1, 2) *= -1;
         tempV(2, 2) *= -1;
         tempSigma(2, 2) *= -1;
     }
+
+    //if (tempSigma(0, 0) < tempSigma(1, 1))
+    //{
+    //    double tempRecord = tempSigma(0, 0);
+    //    tempSigma(0, 0) = tempSigma(1, 1);
+    //    tempSigma(1, 1) = tempRecord;
+    //}
 
     result.U = tempU;
     result.V = tempV;

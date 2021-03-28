@@ -140,36 +140,14 @@ Matrix2d calculateDms2D_double(const vector<Vector2d>& vertexes, const vector<ui
     return M;
 }
 
-Matrix3d calculateDms3D_double(const vector<Vector3d>& vertexes, const vector<uint64_t>& index, const int& i) {
-    int id1 = (i + 1) % 4;
-    int id2 = (i + 2) % 4;
-    int id3 = (i + 3) % 4;
-    double o1x = vertexes[index[id1]][0] - vertexes[index[i]][0];
-    double o1y = vertexes[index[id1]][1] - vertexes[index[i]][1];
-    double o1z = vertexes[index[id1]][2] - vertexes[index[i]][2];
 
-    double o2x = vertexes[index[id2]][0] - vertexes[index[i]][0];
-    double o2y = vertexes[index[id2]][1] - vertexes[index[i]][1];
-    double o2z = vertexes[index[id2]][2] - vertexes[index[i]][2];
-
-    double o3x = vertexes[index[id3]][0] - vertexes[index[i]][0];
-    double o3y = vertexes[index[id3]][1] - vertexes[index[i]][1];
-    double o3z = vertexes[index[id3]][2] - vertexes[index[i]][2];
-
-    Matrix3d M; 
-    M(0, 0) = o1x; M(0, 1) = o2x; M(0, 2) = o3x;
-    M(1, 0) = o1y; M(1, 1) = o2y; M(1, 2) = o3y;
-    M(2, 0) = o1z; M(2, 1) = o2z; M(2, 2) = o3z;
-    
-    return M;
-}
 
 MatrixXd computePFPX2D_double(const Matrix2d& InverseDm) {
     MatrixXd PFPX = MatrixXd::Zero(4, 6);
-    float r00 = InverseDm(0, 0), r01 = InverseDm(0, 1);
-    float r10 = InverseDm(1, 0), r11 = InverseDm(1, 1);
-    float s0 = r00 + r10;
-    float s1 = r01 + r11;
+    double r00 = InverseDm(0, 0), r01 = InverseDm(0, 1);
+    double r10 = InverseDm(1, 0), r11 = InverseDm(1, 1);
+    double s0 = r00 + r10;
+    double s1 = r01 + r11;
     PFPX(0, 0) = -s0;  PFPX(2, 0) = -s1;  PFPX(1, 1) = -s0;  PFPX(3, 1) = -s1;
     PFPX(0, 2) = r00;  PFPX(2, 2) = r01;  PFPX(1, 3) = r00;  PFPX(3, 3) = r01;
     PFPX(0, 4) = r10;  PFPX(2, 4) = r11;  PFPX(1, 5) = r10;  PFPX(3, 5) = r11;
@@ -186,7 +164,7 @@ Matrix2d computePEPF_ARAP2D_double(const Matrix2d& F) {
     return PEPF;
 }
 
-Matrix2d computePEPF_StableNHK_double(const Matrix2d& F, const double& lengthRate, const double& volumRate) {
+Matrix2d computePEPF_StableNHK2D_double(const Matrix2d& F, const double& lengthRate, const double& volumRate) {
     SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
     Matrix2d U, V, R, S, sigma;
     //U = svdResult.U;
@@ -203,7 +181,7 @@ Matrix2d computePEPF_StableNHK_double(const Matrix2d& F, const double& lengthRat
     return PEPF;
 }
 
-Matrix2d computePEPF_Aniostropic_double(const Matrix2d& F, Vector2d direction, const double& scale) {
+Matrix2d computePEPF_Aniostropic2D_double(const Matrix2d& F, Vector2d direction, const double& scale) {
     //double x = 0, y = 1;
     //double rate = sqrt(direction[0] * direction[0] + direction[1] * direction[1]);
     //direction /= rate;
@@ -265,8 +243,8 @@ void fem_explicit2D(mesh2D& mesh) {
         Matrix2d PEPF; PEPF.setZero();
         //PEPF += computePEPX_ARAP2D_double(F);
 
-        PEPF += computePEPF_StableNHK_double(F, lengthRate, volumRate);
-        PEPF += computePEPF_Aniostropic_double(F, direction, aniosScale);
+        PEPF += computePEPF_StableNHK2D_double(F, lengthRate, volumRate);
+        PEPF += computePEPF_Aniostropic2D_double(F, direction, aniosScale);
         //PEPF += computePEPX_Aniostropic_double(F, Vector2d(1, 0), 0.3);
         //cout << "PEPF:\n" << PEPF << endl;
         MatrixXd pepf = vec_double(PEPF);
@@ -351,7 +329,7 @@ void Projected_Newton2D(mesh2D& mesh) {
         MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
         //cout << "F:\n" << F << endl;
-        Matrix2d PEPF = computePEPF_StableNHK_double(F, lengthRate, volumRate);
+        Matrix2d PEPF = computePEPF_StableNHK2D_double(F, lengthRate, volumRate);
 
         //cout << "PEPF:\n" << PEPF << endl;
         MatrixXd pepf = vec_double(PEPF);
@@ -488,8 +466,8 @@ void fem_implicit2D(mesh2D& mesh) {
         MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
         //cout << "F:\n" << F << endl;
-        Matrix2d PEPF = computePEPF_StableNHK_double(F, lengthRate, volumRate);
-        PEPF += computePEPF_Aniostropic_double(F, direction, aniosScale);
+        Matrix2d PEPF = computePEPF_StableNHK2D_double(F, lengthRate, volumRate);
+        PEPF += computePEPF_Aniostropic2D_double(F, direction, aniosScale);
         //cout << "PEPF:\n" << PEPF << endl;
         MatrixXd pepf = vec_double(PEPF);
         /*cout << "pepf:\n" << pepf << endl;
