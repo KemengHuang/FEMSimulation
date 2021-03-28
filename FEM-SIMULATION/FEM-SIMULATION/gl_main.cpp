@@ -93,6 +93,7 @@ void draw_box3D(float ox, float oy, float oz, float width, float height, float l
 
 void draw_mesh2D()
 {
+    glEnable(GL_DEPTH_TEST);
     glLineWidth(1.5f);
     glColor3f(0.8f, 0.1f, 0.8f);
     glBegin(GL_LINES);
@@ -144,10 +145,12 @@ void draw_mesh3D()
 }
 
 void draw_Scene2D() {
-    glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);   //sf ±³¾°ÑÕÉ«
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     draw_box2D(-1, -1, 2, 2);
     draw_mesh2D();
-    glFlush();
+    glutSwapBuffers();
 }
 
 void draw_Scene3D() {
@@ -162,7 +165,7 @@ void draw_Scene3D() {
     glTranslatef(xTrans, yTrans, zTrans);
     glRotatef(xRot, 1.0f, 0.0f, 0.0f);
     glRotatef(yRot, 0.0f, 1.0f, 0.0f);
-    glTranslatef(-0.5, -0.5, -0.5);
+    //glTranslatef(-0.5, -0.5, -0.5);
 
 
     draw_box3D(-1, -1, -1, 2, 2, 2);
@@ -224,8 +227,8 @@ void init(void)
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    //glTranslatef(0.0f, 0.0f, -3.0f);
-    glTranslatef(0.5f, 0.5f, -3.0f);
+    glTranslatef(0.0f, 0.0f, -3.0f);
+    //glTranslatef(0.5f, 0.5f, -3.0f);
 }
 
 
@@ -249,8 +252,8 @@ void reshape_func(GLint width, GLint height)
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    //glTranslatef(0.0f, 0.0f, -3.0f);
-    glTranslatef(0.5f, 0.5f, -4.0f);
+    glTranslatef(0.0f, 0.0f, -3.0f);
+    //glTranslatef(0.5f, 0.5f, -4.0f);
 }
 
 void keyboard_func(unsigned char key, int x, int y)
