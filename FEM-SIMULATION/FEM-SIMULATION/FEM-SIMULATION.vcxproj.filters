@@ -53,5 +53,8 @@
     <ClInclude Include="fem3D.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="fem_timer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

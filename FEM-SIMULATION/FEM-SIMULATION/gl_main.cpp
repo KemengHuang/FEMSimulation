@@ -1,11 +1,12 @@
 #include "GL\glew.h"
 #include "GL\freeglut.h"
-
+#include <fstream>
 #include <iostream>
 #include "fem2D.h"
 #include "fem3D.h"
+#include "fem_timer.h"
 using namespace std;
-
+int step = 0;
 float xRot = 0.0f;
 float yRot = 0.f;
 float xTrans = 0;
@@ -20,8 +21,67 @@ float window_width = 600;
 float window_height = 600;
 int s_dimention = 3;
 bool stop = true;
+bool screenshot = false;
 mesh2D mesh2d;
 mesh3D mesh3d;
+
+bool WriteBitmapFile(int width, int height, const std::string& file_name, unsigned char* bitmapData)
+{
+    BITMAPFILEHEADER bitmapFileHeader;
+    memset(&bitmapFileHeader, 0, sizeof(BITMAPFILEHEADER));
+    bitmapFileHeader.bfSize = sizeof(BITMAPFILEHEADER);
+    bitmapFileHeader.bfType = 0x4d42;   //BM  
+    bitmapFileHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+
+    BITMAPINFOHEADER bitmapInfoHeader;
+    memset(&bitmapInfoHeader, 0, sizeof(BITMAPINFOHEADER));
+    bitmapInfoHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapInfoHeader.biWidth = width;
+    bitmapInfoHeader.biHeight = height;
+    bitmapInfoHeader.biPlanes = 1;
+    bitmapInfoHeader.biBitCount = 24;
+    bitmapInfoHeader.biCompression = BI_RGB;
+    bitmapInfoHeader.biSizeImage = width * abs(height) * 3;
+
+    //////////////////////////////////////////////////////////////////////////  
+    FILE* filePtr;
+    unsigned char tempRGB;
+    int imageIdx;
+
+    for (imageIdx = 0; imageIdx < (int)bitmapInfoHeader.biSizeImage; imageIdx += 3)
+    {
+        tempRGB = bitmapData[imageIdx];
+        bitmapData[imageIdx] = bitmapData[imageIdx + 2];
+        bitmapData[imageIdx + 2] = tempRGB;
+    }
+
+    filePtr = fopen(file_name.c_str(), "wb");
+    if (NULL == filePtr)
+    {
+        return false;
+    }
+
+    fwrite(&bitmapFileHeader, sizeof(BITMAPFILEHEADER), 1, filePtr);
+
+    fwrite(&bitmapInfoHeader, sizeof(BITMAPINFOHEADER), 1, filePtr);
+
+    fwrite(bitmapData, bitmapInfoHeader.biSizeImage, 1, filePtr);
+
+    fclose(filePtr);
+    return true;
+}
+
+void SaveScreenShot(int width, int height, const std::string& file_name)
+{
+    int data_len = height * width * 3;      // bytes
+    void* screen_data = malloc(data_len);
+    memset(screen_data, 0, data_len);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, screen_data);
+
+    WriteBitmapFile(width, height, file_name + ".bmp", (unsigned char*)screen_data);
+
+    free(screen_data);
+}
 
 void draw_box2D(float ox, float oy, float width, float height)
 {
@@ -113,7 +173,7 @@ void draw_mesh2D()
 void draw_mesh3D()
 {
     glEnable(GL_DEPTH_TEST);
-    glLineWidth(1.5f);
+    glLineWidth(0.5f);
     glColor3f(0.8f, 0.1f, 0.8f);
     glBegin(GL_TRIANGLES);
     for (int i = 0; i < mesh3d.tetrahedraNum; i++) {
@@ -126,7 +186,7 @@ void draw_mesh3D()
     glEnd();
     glColor3f(0.8f, 0.8f, 0.1f);
     //glDisable(GL_DEPTH_TEST);
-    glLineWidth(1.5f);
+    glLineWidth(0.5f);
     glBegin(GL_LINES);
     double offset = 1.0;
     for (int i = 0; i < mesh3d.tetrahedraNum; i++) {
@@ -175,7 +235,10 @@ void draw_Scene3D() {
     glutSwapBuffers();
     //glFlush();
 }
-
+double mfsum = 0;
+double total_time = 0;
+int total_cg_iterations = 0;
+int total_newton_iterations = 0;
 void display(void)
 {
     if (s_dimention == 2) {
@@ -186,6 +249,19 @@ void display(void)
     }
 
     if (stop) return;
+    
+    if(screenshot)
+    {
+        std::stringstream ss;
+        ss << "saveScreen/step_";
+        ss.fill('0');
+        ss.width(5);
+        ss << step;
+        std::string file_path = ss.str();
+        SaveScreenShot(window_width, window_height, file_path);
+        step++;
+    }
+
     bool isImplicit = true;
     if (s_dimention == 2) {
         if (isImplicit) {
@@ -198,10 +274,29 @@ void display(void)
     else if (s_dimention == 3) {     
         if (isImplicit) {
             fem_implicit3D(mesh3d);
+            /*double tempS = mfsum;
+            HighResolutionTimerForWin timer;
+            timer.set_start();
+            Projected_Newton3D(mesh3d, mfsum, total_cg_iterations, total_newton_iterations);
+            timer.set_end();
+            total_time += timer.get_millisecond()/1000;
+            cout << "cost time:         "<<total_time << endl;
+            if (abs(mfsum - tempS) < 1e-3) {
+                ofstream output("simulationData.txt");
+                output << "total_time: " << total_time << endl;
+                output << "total_cg_iterations: " << total_cg_iterations << endl;
+                output << "total_newton_iterations: " << total_newton_iterations << endl;
+                output.close();
+                exit(0);
+            }*/
         }
         else {
             fem_explicit3D(mesh3d);
         }
+    }
+    
+    if (step == 20000) {
+        exit(0);
     }
 }
 
@@ -211,7 +306,7 @@ void init(void)
     glClearColor(0.0, 0.0, 0.0, 1.0);
 
     if (s_dimention == 2) {
-        initMesh2D(mesh2d, 0, 0.2);
+        initMesh2D(mesh2d, 1, 0.2);
     }
     else if (s_dimention == 3) {
         initMesh3D(mesh3d, 1, 0.2);
@@ -230,7 +325,6 @@ void init(void)
     glTranslatef(0.0f, 0.0f, -3.0f);
     //glTranslatef(0.5f, 0.5f, -3.0f);
 }
-
 
 
 
@@ -291,6 +385,11 @@ void keyboard_func(unsigned char key, int x, int y)
     if (key == ' ')
     {
         stop = !stop;
+    }
+
+    if (key == '/')
+    {
+        screenshot = !screenshot;
     }
     glutPostRedisplay();
 }

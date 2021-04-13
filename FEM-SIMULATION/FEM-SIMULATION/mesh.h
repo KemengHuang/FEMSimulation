@@ -1,7 +1,6 @@
 #pragma once
 #ifndef FEM_MESH_H
 #define FEM_MESH_H
-
 #include "Eigen/Eigen"
 #include <vector>
 using namespace std;
@@ -101,6 +100,8 @@ struct mesh_cuboid {
 
 class mesh2D {
 public:
+	vector<double> areas;
+	vector<double> masses;
 	vector<Vector2d> vertexes;
 	vector<vector<uint64_t>> triangles;
 	vector<Vector2d> forces;
@@ -113,14 +114,21 @@ public:
 
 class mesh3D {
 public:
+	double maxVolum;
+	vector<Matrix3d> Constraints;
+	vector<double> volum;
+	vector<double> masses;
 	vector<Vector3d> vertexes;
+	vector<Vector3d> d_positions;
 	vector<vector<uint64_t>> tetrahedras;
 	vector<Vector3d> forces;
 	vector<Vector3d> velocities;
+	vector<Vector3d> d_velocities;
 	vector<Matrix3d> DM_triangle_inverse;
 	int vertexNum;
 	int tetrahedraNum;
 	void InitMesh(int type, double scale);
+	bool load_tetrahedraMesh(const std::string& filename, double scale);
 };
 
 #endif // !FEM_MESH.H

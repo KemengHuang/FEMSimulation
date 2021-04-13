@@ -6,6 +6,23 @@
 using namespace std;
 using namespace FEM;
 
+double calculateArea(const vector<Vector2d>& vertexes, const vector<uint64_t>& index) {
+    int id0 = 0;
+    int id1 = 1;
+    int id2 = 2;
+    double o1x = vertexes[index[id1]][0] - vertexes[index[id0]][0];
+    double o1y = vertexes[index[id1]][1] - vertexes[index[id0]][1];
+    Vector3d OA = Vector3d(o1x, o1y, 0);
+
+    double o2x = vertexes[index[id2]][0] - vertexes[index[id0]][0];
+    double o2y = vertexes[index[id2]][1] - vertexes[index[id0]][1];
+    Vector3d OB = Vector3d(o2x, o2y, 0);
+
+    double Area = (OA.cross(OB)).norm();
+    
+    return Area;
+}
+
 Matrix4d project_ARAP_H_2D(const Matrix2d& F) {
     SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
     Matrix2d Ue, sigma, Ve;
@@ -72,18 +89,18 @@ Matrix4d project_ANIOSI5_H_2D(const Matrix2d& F, Vector2d direction, const doubl
 
 Matrix4d project_StabbleNHK_H_2D(const Matrix2d& F, const double& lengthRate, const double& volumRate) {
     SVDResult2D_double svdResult = SingularValueDecomposition2D_double(F);
-    Matrix2d U, sigma, V, A;
+    Matrix2d U, sigma, V;
     U = svdResult.U;
     sigma = svdResult.SIGMA;
     V = svdResult.V;
 
     double u = lengthRate, r = volumRate;
-    A.setZero();
-    A(0, 0) = u;
-    A(1, 1) = u;
+    //A.setZero();
+    //A(0, 0) = u;
+    //A(1, 1) = u;
 
-    double lamda0 = A.eigenvalues()(0).real();
-    double lamda1 = A.eigenvalues()(1).real();
+    double lamda0 = u;// A.eigenvalues()(0).real();
+    double lamda1 = u;// A.eigenvalues()(1).real();
 
     Matrix2d D0, D1;
     D0 << 1, 0, 0, 0;
@@ -254,7 +271,12 @@ void fem_explicit2D(mesh2D& mesh) {
         MatrixXd f = -PFPX.transpose() * pepf;
         //cout << "f:\n" << f << endl;
         for (int i = 0; i < f.rows(); i++) {
-            if (abs(f(i, 0)) < 1e-10) f(i, 0) = 0;
+            if (abs(f(i, 0)) < 1e-10) {
+                f(i, 0) = 0;
+            }
+            else {
+                f(i, 0) = mesh.areas[ii] * f(i, 0);
+            }
         }
 
         mesh.forces[mesh.triangles[ii][0]][0] += f(0, 0);
@@ -269,8 +291,8 @@ void fem_explicit2D(mesh2D& mesh) {
     //if (sqrt(sum) < 1e-4) return;
     for (int ii = 0; ii < mesh.vertexNum; ii++) {
 
-        double acx = mesh.forces[ii][0] * mass_inverse;
-        double acy = mesh.forces[ii][1] * mass_inverse - 9.8;
+        double acx = mesh.forces[ii][0] / mesh.masses[ii];
+        double acy = mesh.forces[ii][1] / mesh.masses[ii] - 9.8;
 
         mesh.forces[ii][0] = 0;
         mesh.forces[ii][1] = 0;
@@ -313,6 +335,12 @@ void initMesh2D(mesh2D &mesh, int type, double scale) {
 
     for (int i = 0; i < mesh.triangleNum; i++) {
         mesh.DM_triangle_inverse.push_back(calculateDms2D_double(mesh.vertexes, mesh.triangles[i], 0).inverse());
+        double area = calculateArea(mesh.vertexes, mesh.triangles[i]);
+
+        mesh.areas.push_back(area);
+        mesh.masses[mesh.triangles[i][0]] += area * density / 3;
+        mesh.masses[mesh.triangles[i][1]] += area * density / 3;
+        mesh.masses[mesh.triangles[i][2]] += area * density / 3;
     }
     
     //if (true) {
@@ -324,6 +352,8 @@ void initMesh2D(mesh2D &mesh, int type, double scale) {
 void Projected_Newton2D(mesh2D& mesh) {
     
     VectorXd P(mesh.vertexNum * 2);
+    double tolerance = 1e-10;
+    double fsum = 0;
     P.setZero();
     for (int ii = 0; ii < mesh.triangleNum; ii++) {
         MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
@@ -340,6 +370,15 @@ void Projected_Newton2D(mesh2D& mesh) {
         //for (int i = 0; i < f.rows(); i++) {
         //    if (abs(f(i, 0)) < 1e-10) f(i, 0) = 0;
         //}
+        for (int i = 0; i < f.rows(); i++) {
+            if (abs(f(i, 0)) < tolerance) {
+                f(i, 0) = 0;
+            }
+            else {
+                f(i, 0) = mesh.areas[ii] * f(i, 0);
+            }
+            fsum += abs(f(i, 0));
+        }
 
         //compute the b for formula: Ax = b
         mesh.forces[mesh.triangles[ii][0]][0] += f(0, 0);
@@ -351,7 +390,7 @@ void Projected_Newton2D(mesh2D& mesh) {
 
         //Init Precondition Matrix
         Matrix4d Hq = project_StabbleNHK_H_2D(F, lengthRate, volumRate);
-        MatrixXd H = PFPX.transpose() * Hq * PFPX;
+        MatrixXd H = mesh.areas[ii] * PFPX.transpose() * Hq * PFPX;
 
         //cout << "H:\n" << H << endl;
 
@@ -375,8 +414,10 @@ void Projected_Newton2D(mesh2D& mesh) {
     //double dX[9][2] = { 0 };
     for (int i = 0; i < mesh.vertexNum; i++) {
         //compute delta0
-        double vx = abs(P(i * 2)) > 1e-5 ? 1 / P(i * 2) : 1;
-        double vy = abs(P(i * 2) + 1) > 1e-5 ? 1 / P(i * 2 + 1) : 1;
+        //double vx = abs(P(i * 2)) > 1e-5 ? 1 / P(i * 2) : 1;
+        //double vy = abs(P(i * 2) + 1) > 1e-5 ? 1 / P(i * 2 + 1) : 1;
+        double vx = 1 / P(i * 2);
+        double vy = 1 / P(i * 2 + 1);
         delta0 += mesh.forces[i][0] * mesh.forces[i][0] * vx;
         delta0 += mesh.forces[i][1] * mesh.forces[i][1] * vy;
         
@@ -403,7 +444,7 @@ void Projected_Newton2D(mesh2D& mesh) {
             MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
             MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
             Matrix4d Hq = project_StabbleNHK_H_2D(F, lengthRate, volumRate);
-            MatrixXd H = PFPX.transpose() * Hq * PFPX;
+            MatrixXd H = mesh.areas[ii] * PFPX.transpose() * Hq * PFPX;
             VectorXd tempC(6);
             tempC(0) = c[mesh.triangles[ii][0]][0];
             tempC(1) = c[mesh.triangles[ii][0]][1];
@@ -459,9 +500,10 @@ void Projected_Newton2D(mesh2D& mesh) {
 void fem_implicit2D(mesh2D& mesh) {
 
     Vector2d direction = Vector2d(1, 2);
-    
+    double tolerance = 1e-10;
     VectorXd P(mesh.vertexNum * 2), b0(mesh.vertexNum * 2);
     P.setZero(); b0.setZero();
+    double fsum = 0;
     for (int ii = 0; ii < mesh.triangleNum; ii++) {
         MatrixXd PFPX = computePFPX2D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
@@ -474,8 +516,16 @@ void fem_implicit2D(mesh2D& mesh) {
         cout << "PFPX:\n" << PFPX << endl;*/
         MatrixXd f = -PFPX.transpose() * pepf;
         //cout << "f:\n" << f << endl;
+
+
         for (int i = 0; i < f.rows(); i++) {
-            if (abs(f(i, 0)) < 1e-16) f(i, 0) = 0;
+            if (abs(f(i, 0)) < tolerance) {
+                f(i, 0) = 0;
+            }
+            else {
+                f(i, 0) = mesh.areas[ii] * f(i, 0);
+            }
+            fsum += abs(f(i, 0));
         }
 
         //compute the b for formula: Ax = b
@@ -489,7 +539,7 @@ void fem_implicit2D(mesh2D& mesh) {
         //Init Precondition Matrix
         Matrix4d Hq = project_StabbleNHK_H_2D(F, lengthRate, volumRate);
         Hq += project_ANIOSI5_H_2D(F, direction, aniosScale);
-        MatrixXd H = -PFPX.transpose() * Hq * PFPX;
+        MatrixXd H = -mesh.areas[ii] * PFPX.transpose() * Hq * PFPX;
 
 
         VectorXd tempC(6);
@@ -510,12 +560,12 @@ void fem_implicit2D(mesh2D& mesh) {
         //cout << "H:\n" << H << endl;
 
         //double threshold = 1e-10;
-        P(mesh.triangles[ii][0] * 2) += mass - implicit_time_step * implicit_time_step * H(0, 0);
-        P(mesh.triangles[ii][0] * 2 + 1) += mass - implicit_time_step * implicit_time_step * H(1, 1);
-        P(mesh.triangles[ii][1] * 2) += mass - implicit_time_step * implicit_time_step * H(2, 2);
-        P(mesh.triangles[ii][1] * 2 + 1) += mass - implicit_time_step * implicit_time_step * H(3, 3);
-        P(mesh.triangles[ii][2] * 2) += mass - implicit_time_step * implicit_time_step * H(4, 4);
-        P(mesh.triangles[ii][2] * 2 + 1) += mass - implicit_time_step * implicit_time_step * H(5, 5);
+        P(mesh.triangles[ii][0] * 2) += mesh.areas[ii] * density / 3 - implicit_time_step * implicit_time_step * H(0, 0);
+        P(mesh.triangles[ii][0] * 2 + 1) += mesh.areas[ii] * density / 3 - implicit_time_step * implicit_time_step * H(1, 1);
+        P(mesh.triangles[ii][1] * 2) += mesh.areas[ii] * density / 3 - implicit_time_step * implicit_time_step * H(2, 2);
+        P(mesh.triangles[ii][1] * 2 + 1) += mesh.areas[ii] * density / 3 - implicit_time_step * implicit_time_step * H(3, 3);
+        P(mesh.triangles[ii][2] * 2) += mesh.areas[ii] * density / 3 - implicit_time_step * implicit_time_step * H(4, 4);
+        P(mesh.triangles[ii][2] * 2 + 1) += mesh.areas[ii] * density / 3 - implicit_time_step * implicit_time_step * H(5, 5);
     }
     //cout << "P\n" << P << endl;
     double delta0 = 0;
@@ -529,8 +579,10 @@ void fem_implicit2D(mesh2D& mesh) {
     //double dX[9][2] = { 0 };
     for (int i = 0; i < mesh.vertexNum; i++) {
         //compute delta0
-        double vx = abs(P(i * 2)) > 1e-5 ? 1 / P(i * 2) : 1;
-        double vy = abs(P(i * 2) + 1) > 1e-5 ? 1 / P(i * 2 + 1) : 1;
+        /*double vx = abs(P(i * 2)) > 1e-5 ? 1 / P(i * 2) : 1;
+        double vy = abs(P(i * 2) + 1) > 1e-5 ? 1 / P(i * 2 + 1) : 1;*/
+        double vx = 1 / P(i * 2);
+        double vy = 1 / P(i * 2 + 1);
         delta0 += b0[i * 2] * b0[i * 2] * vx;
         delta0 += b0[i * 2 + 1] * b0[i * 2 + 1] * vy;
 
@@ -557,10 +609,10 @@ void fem_implicit2D(mesh2D& mesh) {
             MatrixXd F = calculateDms2D_double(mesh.vertexes, mesh.triangles[ii], 0) * mesh.DM_triangle_inverse[ii];
             Matrix4d Hq = project_StabbleNHK_H_2D(F, lengthRate, volumRate);
             Hq += project_ANIOSI5_H_2D(F, direction, aniosScale);
-            MatrixXd H = -PFPX.transpose() * Hq * PFPX;
+            MatrixXd H = -mesh.areas[ii] * PFPX.transpose() * Hq * PFPX;
             MatrixXd M(6, 6);// = mass * MatrixXd
             M.setIdentity();
-            M = mass * M;
+            M = density * mesh.areas[ii] / 3 * M;
             MatrixXd A = M - implicit_time_step * implicit_time_step * H;
             VectorXd tempC(6);
             tempC(0) = c[mesh.triangles[ii][0]][0];
@@ -618,22 +670,22 @@ void fem_implicit2D(mesh2D& mesh) {
         }
 
         mesh.velocities[ii][0] += dV[ii][0];
-        mesh.velocities[ii][1] += dV[ii][1] + gravity * implicit_time_step;
+        mesh.velocities[ii][1] += dV[ii][1] +gravity * implicit_time_step;
 
-       /* mesh.velocities[2][1] = 0;
-        mesh.velocities[3][1] = 0;
-        mesh.velocities[4][1] = 0;
-        mesh.velocities[2][0] = 0;
-        mesh.velocities[3][0] = 0;
-        mesh.velocities[4][0] = 0;
+        //mesh.velocities[2][1] = 0;
+        //mesh.velocities[3][1] = 0;
+        //mesh.velocities[4][1] = 0;
+        //mesh.velocities[2][0] = -1;
+        //mesh.velocities[3][0] = -1;
+        //mesh.velocities[4][0] = -1;
 
 
-        mesh.velocities[12][1] = 0;
-        mesh.velocities[13][1] = 0;
-        mesh.velocities[14][1] = 0;
-        mesh.velocities[12][0] = 0;
-        mesh.velocities[13][0] = 0;
-        mesh.velocities[14][0] = 0;*/
+        //mesh.velocities[12][1] = 0;
+        //mesh.velocities[13][1] = 0;
+        //mesh.velocities[14][1] = 0;
+        //mesh.velocities[12][0] = 1;
+        //mesh.velocities[13][0] = 1;
+        //mesh.velocities[14][0] = 1;
 
         mesh.vertexes[ii][0] += mesh.velocities[ii][0] * implicit_time_step;
         mesh.vertexes[ii][1] += mesh.velocities[ii][1] * implicit_time_step;
