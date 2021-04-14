@@ -2,10 +2,12 @@
 #include "fem_math.h"
 #include<iostream>
 #include <vector>
+#include <tbb/parallel_for.h>
+#include <tbb/spin_mutex.h>
 #include "fem_parameters.h"
 using namespace std;
 using namespace FEM;
-
+#define USE_TBB
 void checkDegenerateElements() {
 
 }
@@ -95,7 +97,7 @@ void initMesh3D(mesh3D& mesh, int type, double scale) {
     if (type == 1) {
         for (int i = 0; i < mesh.vertexNum; i++) {
             mesh.vertexes[i] = mesh.vertexes[i] * 2 -Vector3d(scale, scale, scale);
-            //mesh.vertexes[i][1] -= 0.8;
+            //mesh.vertexes[i][1] -= 0.5;
         }
     }
     double min = 10000000000000;
@@ -142,8 +144,8 @@ void initMesh3D(mesh3D& mesh, int type, double scale) {
     //    }
     //}
 
-    cout << "   " << min;
-    cout << endl;
+    //cout << "   " << min;
+    //cout << endl;
 }
 
 Matrix3d computePEPF_StableNHK3D_double(const Matrix3d& F, const double& lengthRate, const double& volumRate) {
@@ -520,8 +522,15 @@ MatrixXd project_ANIOSI5_H_3D(const Matrix3d& F, Vector3d direction, const doubl
 double angle = 0;
 
 void fem_explicit3D(mesh3D& mesh) {
-    Vector3d direction = Vector3d(0, 1, 0);
-    for (int ii = 0; ii < mesh.tetrahedraNum; ii++) {
+    Vector3d direction = Vector3d(1, 3, 1);
+
+#ifdef USE_TBB
+    tbb::spin_mutex countMutex;
+    tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
+#else
+    for (int ii = 0; ii < mesh.tetrahedraNum; ii++)
+#endif
+    {
         MatrixXd PFPX = computePFPX3D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms3D_double(mesh.vertexes, mesh.tetrahedras[ii], 0) * mesh.DM_triangle_inverse[ii];
         //double volum = calculateVolum(mesh.vertexes, mesh.tetrahedras[ii]);
@@ -548,23 +557,19 @@ void fem_explicit3D(mesh3D& mesh) {
             }
         }
 
-        mesh.forces[mesh.tetrahedras[ii][0]][0] += f(0, 0);
-        mesh.forces[mesh.tetrahedras[ii][0]][1] += f(1, 0);
-        mesh.forces[mesh.tetrahedras[ii][0]][2] += f(2, 0);
-
-        mesh.forces[mesh.tetrahedras[ii][1]][0] += f(3, 0);
-        mesh.forces[mesh.tetrahedras[ii][1]][1] += f(4, 0);
-        mesh.forces[mesh.tetrahedras[ii][1]][2] += f(5, 0);
-
-        mesh.forces[mesh.tetrahedras[ii][2]][0] += f(6, 0);
-        mesh.forces[mesh.tetrahedras[ii][2]][1] += f(7, 0);
-        mesh.forces[mesh.tetrahedras[ii][2]][2] += f(8, 0);
-
-        mesh.forces[mesh.tetrahedras[ii][3]][0] += f(9, 0);
-        mesh.forces[mesh.tetrahedras[ii][3]][1] += f(10, 0);
-        mesh.forces[mesh.tetrahedras[ii][3]][2] += f(11, 0);
+        for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+            countMutex.lock();
+            mesh.forces[mesh.tetrahedras[ii][i / 3]][i % 3] += f(i, 0);
+            countMutex.unlock();
+#else
+            mesh.forces[mesh.tetrahedras[ii][i / 3]][i % 3] += f(i, 0);
+#endif
+        }
     }
-
+#ifdef USE_TBB
+    );
+#endif
     //Matrix3d rotationTop, rotationDown;
     //double angleYVelocity = (PI / 12)* explicit_time_step;
     //angle += angleYVelocity;
@@ -583,7 +588,12 @@ void fem_explicit3D(mesh3D& mesh) {
     //if (sqrt(sum) < 1e-4) return;
     //double gravity = -9.8;
     double gravity = -9.8;
-    for (int ii = 0; ii < mesh.vertexNum; ii++) {
+#ifdef USE_TBB
+    tbb::parallel_for(0, mesh.vertexNum, 1, [&](int ii)
+#else
+    for (int ii = 0; ii < mesh.vertexNum; ii++)
+#endif
+    {
 
         double acx = mesh.forces[ii][0] / mesh.masses[ii];
         double acy = mesh.forces[ii][1] / mesh.masses[ii] + gravity;
@@ -630,14 +640,17 @@ void fem_explicit3D(mesh3D& mesh) {
 
         boundary_process(mesh, ii, false);
     }
+#ifdef USE_TBB
+    );
+#endif
 }
-
-
+//#include<fstream>
+//ofstream out("fsum.txt");
 
 void fem_implicit3D(mesh3D& mesh) {
 
-    Vector3d direction = Vector3d(0, 1, 0);
-    float tolerance = 1e-9;
+    Vector3d direction = Vector3d(-1, 3, 1);
+    float tolerance = 1e-3;
     VectorXd P(mesh.vertexNum * 3);
     vector<Vector3d> b0(mesh.vertexNum, Vector3d(0, 0, 0));
     P.setZero();
@@ -676,9 +689,15 @@ void fem_implicit3D(mesh3D& mesh) {
     //    }
     //}
 
-
-
-    for (int ii = 0; ii < mesh.tetrahedraNum; ii++) {
+    atomic<int> counter;
+    counter = 0;
+#ifdef USE_TBB
+    tbb::spin_mutex countMutex;
+    tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
+#else
+    for (int ii = 0; ii < mesh.tetrahedraNum; ii++)
+#endif
+    {
         MatrixXd PFPX = computePFPX3D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms3D_double(mesh.vertexes, mesh.tetrahedras[ii], 0) * mesh.DM_triangle_inverse[ii];
         //cout << "F:\n" << F << endl;
@@ -696,12 +715,21 @@ void fem_implicit3D(mesh3D& mesh) {
             }
             else {
                 f(i, 0) = mesh.volum[ii] * f(i, 0);
+                if (!counter) {
+                    counter.fetch_add(1);
+                }
             }
-            fsum += abs(f(i, 0));
+            //fsum += abs(f(i, 0));
         }
 
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 12; i++) {  
+#ifdef USE_TBB
+            countMutex.lock();
             b0[mesh.tetrahedras[ii][i / 3]][i % 3] += f(i, 0) * implicit_time_step;
+            countMutex.unlock();
+#else
+            b0[mesh.tetrahedras[ii][i / 3]][i % 3] += f(i, 0) * implicit_time_step;
+#endif
         }
 
         //Init Precondition Matrix
@@ -722,7 +750,13 @@ void fem_implicit3D(mesh3D& mesh) {
         VectorXd tempQ = implicit_time_step * implicit_time_step * H * tempC;
 
         for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+            countMutex.lock();
             b0[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+            countMutex.unlock();
+#else
+            b0[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+#endif
         }
 
 
@@ -733,16 +767,31 @@ void fem_implicit3D(mesh3D& mesh) {
         tempQ = implicit_time_step * H * tempC;
 
         for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+            countMutex.lock();
             b0[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+            countMutex.unlock();
+#else
+            b0[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+#endif
         }
 
         for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+            countMutex.lock();
             P[mesh.tetrahedras[ii][i / 3] * 3 + i % 3] += mesh.volum[ii] * density / 4 - implicit_time_step * implicit_time_step * H(i, i);
+            countMutex.unlock();
+#else
+            P[mesh.tetrahedras[ii][i / 3] * 3 + i % 3] += mesh.volum[ii] * density / 4 - implicit_time_step * implicit_time_step * H(i, i);
+#endif
         }
     }
+#ifdef USE_TBB
+    );
+#endif
 
     //vector<Vector3d> dV(mesh.vertexNum, Vector3d(0, 0, 0));
-    std::cout << "fsum: " << fsum << endl;
+    //std::cout << "counter: " << counter << endl;
 
     vector<Vector3d> tempDeltaVelocites(mesh.vertexNum, Vector3d(0, 0, 0));
     /*for (int i = 0; i < mesh.vertexNum; i++) {
@@ -752,12 +801,14 @@ void fem_implicit3D(mesh3D& mesh) {
     double localOptimal = DBL_MAX;
     bool getLocalOpt = false;
 
-    if (fsum>tolerance) {
-        
+
+    //out << fsum << endl;
+    if (counter) {
+        //out << fsum << endl;
         //cout << "P\n" << P << endl;
         double delta0 = 0;
         double deltaO = 0;
-        
+
         vector<Vector3d> r(mesh.vertexNum, Vector3d(0, 0, 0));
         vector<Vector3d> c(mesh.vertexNum, Vector3d(0, 0, 0));
 
@@ -774,7 +825,13 @@ void fem_implicit3D(mesh3D& mesh) {
             delta0 += filter_b[2] * filter_b[2] * vz;
         }
 
-        for (int ii = 0; ii < mesh.tetrahedraNum; ii++) {
+#ifdef USE_TBB
+        //tbb::spin_mutex countMutex;
+        tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
+#else
+        for (int ii = 0; ii < mesh.tetrahedraNum; ii++)
+#endif
+        {
             MatrixXd PFPX = computePFPX3D_double(mesh.DM_triangle_inverse[ii]);
             MatrixXd F = calculateDms3D_double(mesh.vertexes, mesh.tetrahedras[ii], 0) * mesh.DM_triangle_inverse[ii];
             MatrixXd Hq = project_StabbleNHK_2_H_3D(F, lengthRate, volumRate);
@@ -794,11 +851,22 @@ void fem_implicit3D(mesh3D& mesh) {
             VectorXd tempQ = A * tempC;
 
             for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+                countMutex.lock();
                 r[mesh.tetrahedras[ii][i / 3]][i % 3] += -tempQ(i);
+                countMutex.unlock();
+#else
+                r[mesh.tetrahedras[ii][i / 3]][i % 3] += -tempQ(i);
+#endif
             }
         }
+#ifdef USE_TBB
+        );
+#endif
 
-        for (int i = 0; i < mesh.vertexNum; i++) {
+        for (int i = 0; i < mesh.vertexNum; i++)
+
+        {
             r[i] += b0[i];
             r[i] = mesh.Constraints[i] * r[i];
             c[i][0] = r[i][0] * P(i * 3);
@@ -810,17 +878,23 @@ void fem_implicit3D(mesh3D& mesh) {
             deltaN += c[i][1] * r[i][1];
             deltaN += c[i][2] * r[i][2];
         }
+
         //localOptimal = deltaN;
-        
+
         double errorRate = 1e-6;
         std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN << endl;
         //PCG main loop
         int cgCounts = 0;
         while (deltaN > errorRate* errorRate* delta0) {
             cgCounts++;
-            std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN <<"      iteration_counts:      "<<cgCounts<<endl;
+            std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN << "      iteration_counts:      " << cgCounts << endl;
             vector<Vector3d> q(mesh.vertexNum, Vector3d(0, 0, 0));
-            for (int ii = 0; ii < mesh.tetrahedraNum; ii++) {
+#ifdef USE_TBB
+            tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
+#else
+            for (int ii = 0; ii < mesh.tetrahedraNum; ii++)
+#endif
+            {
                 MatrixXd PFPX = computePFPX3D_double(mesh.DM_triangle_inverse[ii]);
                 MatrixXd F = calculateDms3D_double(mesh.vertexes, mesh.tetrahedras[ii], 0) * mesh.DM_triangle_inverse[ii];
                 MatrixXd Hq = project_StabbleNHK_2_H_3D(F, lengthRate, volumRate);
@@ -839,10 +913,18 @@ void fem_implicit3D(mesh3D& mesh) {
                 VectorXd tempQ = A * tempC;
 
                 for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+                    countMutex.lock();
                     q[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+                    countMutex.unlock();
+#else
+                    q[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+#endif
                 }
             }
-
+#ifdef USE_TBB
+            );
+#endif
             double tempSum = 0;
             for (int i = 0; i < mesh.vertexNum; i++) {
                 q[i] = mesh.Constraints[i] * q[i];
@@ -873,22 +955,43 @@ void fem_implicit3D(mesh3D& mesh) {
             if (deltaN < localOptimal) {
                 localOptimal = deltaN;
                 getLocalOpt = true;
-                for (int j = 0; j < mesh.vertexNum; j++) {
+#ifdef USE_TBB
+                tbb::parallel_for(0, mesh.vertexNum, 1, [&](int j)
+#else
+                for (int j = 0; j < mesh.vertexNum; j++)
+#endif
+                {
                     tempDeltaVelocites[j] = Vector3d(mesh.d_velocities[j]);
                 }
+#ifdef USE_TBB
+                );
+#endif
             }
-
-            for (int i = 0; i < mesh.vertexNum; i++) {
+#ifdef USE_TBB
+            tbb::parallel_for(0, mesh.vertexNum, 1, [&](int i)
+#else
+            for (int i = 0; i < mesh.vertexNum; i++)
+#endif
+            {
                 c[i][0] = s[i][0] + (deltaN / deltaO) * c[i][0];
                 c[i][1] = s[i][1] + (deltaN / deltaO) * c[i][1];
                 c[i][2] = s[i][2] + (deltaN / deltaO) * c[i][2];
                 c[i] = mesh.Constraints[i] * c[i];
             }
+#ifdef USE_TBB
+            );
+#endif
         }
     }
     //cout << "deltaN:  " << deltaN << endl;
     double gravity = -9.8;
-    for (int ii = 0; ii < mesh.vertexNum; ii++) {
+
+#ifdef USE_TBB
+    tbb::parallel_for(0, mesh.vertexNum, 1, [&](int ii)
+#else
+    for (int ii = 0; ii < mesh.vertexNum; ii++)
+#endif
+    {
         //clear float numerical error
         //if (getLocalOpt) {
         //    mesh.d_velocities[ii] = tempDeltaVelocites[ii];
@@ -940,16 +1043,28 @@ void fem_implicit3D(mesh3D& mesh) {
 
         boundary_process(mesh, ii, resetContraint);
     }
+#ifdef USE_TBB
+    );
+#endif
 }
 
-void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, int& total_newton_iterations) {
+void Projected_Newton3D(mesh3D& mesh, double& mfsum, int& total_cg_iterations, int& total_newton_iterations) {
     Vector3d direction = Vector3d(0, 1, 0);
     float tolerance = 1e-8;
     VectorXd P(mesh.vertexNum * 3);
     vector<Vector3d> b0(mesh.vertexNum, Vector3d(0, 0, 0));
     P.setZero();
     double fsum = 0;
-    for (int ii = 0; ii < mesh.tetrahedraNum; ii++) {
+
+    atomic<int> counter;
+    counter = 0;
+#ifdef USE_TBB
+    tbb::spin_mutex countMutex;
+    tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
+#else
+    for (int ii = 0; ii < mesh.tetrahedraNum; ii++)
+#endif
+    {
         MatrixXd PFPX = computePFPX3D_double(mesh.DM_triangle_inverse[ii]);
         MatrixXd F = calculateDms3D_double(mesh.vertexes, mesh.tetrahedras[ii], 0) * mesh.DM_triangle_inverse[ii];
         //cout << "F:\n" << F << endl;
@@ -962,17 +1077,26 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
         MatrixXd f = PFPX.transpose() * pepf;
         //cout << "f:\n" << f << endl;
         for (int i = 0; i < f.rows(); i++) {
-            if (abs(f(i, 0)) < 1e-8) {
+            if (abs(f(i, 0)) < tolerance) {
                 f(i, 0) = 0;
             }
             else {
                 f(i, 0) = mesh.volum[ii] * f(i, 0);
+                if (!counter) {
+                    counter.fetch_add(1);
+                }
             }
-            fsum += abs(f(i, 0));
+            //fsum += abs(f(i, 0));
         }
 
         for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+            countMutex.lock();
             b0[mesh.tetrahedras[ii][i / 3]][i % 3] += f(i, 0);
+            countMutex.unlock();
+#else
+            b0[mesh.tetrahedras[ii][i / 3]][i % 3] += f(i, 0);
+#endif
         }
 
         MatrixXd Hq = project_StabbleNHK_2_H_3D(F, lengthRate, volumRate);
@@ -980,10 +1104,19 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
         MatrixXd H = mesh.volum[ii] * PFPX.transpose() * Hq * PFPX;
 
         for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+            countMutex.lock();
             P[mesh.tetrahedras[ii][i / 3] * 3 + i % 3] += H(i, i);
+            countMutex.unlock();
+#else
+            P[mesh.tetrahedras[ii][i / 3] * 3 + i % 3] += H(i, i);
+#endif
         }
 
     }
+#ifdef USE_TBB
+    );
+#endif
     mfsum = fsum;
     //std::cout << "fsum: " << fsum << endl;
 
@@ -993,13 +1126,13 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
     double localOptimal = DBL_MAX;
     bool getLocalOpt = false;
     vector<Vector3d> dX(mesh.vertexNum, Vector3d(0, 0, 0));
-    if (fsum > tolerance) {
+    if (counter) {
         double delta0 = 0;
         double deltaO = 0;
 
         vector<Vector3d> r(mesh.vertexNum, Vector3d(0, 0, 0));
         vector<Vector3d> c(mesh.vertexNum, Vector3d(0, 0, 0));
-        
+
         for (int i = 0; i < mesh.vertexNum; i++) {
             double vx = 1 / (P(i * 3));
             double vy = 1 / (P(i * 3 + 1));
@@ -1010,7 +1143,9 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
             delta0 += filter_b[2] * filter_b[2] * vz;
         }
 
-        for (int i = 0; i < mesh.vertexNum; i++) {
+
+        for (int i = 0; i < mesh.vertexNum; i++)
+        {
             r[i] = b0[i];
             r[i] = mesh.Constraints[i] * r[i];
             c[i][0] = r[i][0] * P(i * 3);
@@ -1032,7 +1167,12 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
             cgCounts++;
             //std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN << "      iteration_counts:      " << cgCounts << endl;
             vector<Vector3d> q(mesh.vertexNum, Vector3d(0, 0, 0));
-            for (int ii = 0; ii < mesh.tetrahedraNum; ii++) {
+#ifdef USE_TBB
+            tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
+#else
+            for (int ii = 0; ii < mesh.tetrahedraNum; ii++)
+#endif
+            {
                 MatrixXd PFPX = computePFPX3D_double(mesh.DM_triangle_inverse[ii]);
                 MatrixXd F = calculateDms3D_double(mesh.vertexes, mesh.tetrahedras[ii], 0) * mesh.DM_triangle_inverse[ii];
                 MatrixXd Hq = project_StabbleNHK_2_H_3D(F, lengthRate, volumRate);
@@ -1051,10 +1191,18 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
                 VectorXd tempQ = H * tempC;
 
                 for (int i = 0; i < 12; i++) {
+#ifdef USE_TBB
+                    countMutex.lock();
                     q[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+                    countMutex.unlock();
+#else
+                    q[mesh.tetrahedras[ii][i / 3]][i % 3] += tempQ(i);
+#endif
                 }
             }
-
+#ifdef USE_TBB
+            );
+#endif
             double tempSum = 0;
             for (int i = 0; i < mesh.vertexNum; i++) {
                 q[i] = mesh.Constraints[i] * q[i];
@@ -1085,23 +1233,46 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
             if (deltaN < localOptimal) {
                 localOptimal = deltaN;
                 getLocalOpt = true;
-                for (int j = 0; j < mesh.vertexNum; j++) {
+#ifdef USE_TBB
+                tbb::parallel_for(0, mesh.vertexNum, 1, [&](int j)
+#else
+                for (int j = 0; j < mesh.vertexNum; j++)
+#endif
+                {
                     tempDeltaX[j] = Vector3d(dX[j]);
                 }
+#ifdef USE_TBB
+                );
+#endif
             }
 
-            for (int i = 0; i < mesh.vertexNum; i++) {
+#ifdef USE_TBB
+            tbb::parallel_for(0, mesh.vertexNum, 1, [&](int i)
+#else
+            for (int i = 0; i < mesh.vertexNum; i++)
+#endif
+            {
                 c[i][0] = s[i][0] + (deltaN / deltaO) * c[i][0];
                 c[i][1] = s[i][1] + (deltaN / deltaO) * c[i][1];
                 c[i][2] = s[i][2] + (deltaN / deltaO) * c[i][2];
                 c[i] = mesh.Constraints[i] * c[i];
             }
+#ifdef USE_TBB
+            );
+#endif
         }
-        cout << "cg_counts:   " << cgCounts << endl;
+        //cout << "cg_counts:   " << cgCounts << endl;
         total_cg_iterations += cgCounts;
     }
+
     total_newton_iterations++;
-    for (int i = 0; i < mesh.vertexNum; i++) {
+
+#ifdef USE_TBB
+    tbb::parallel_for(0, mesh.vertexNum, 1, [&](int i)
+#else
+    for (int i = 0; i < mesh.vertexNum; i++)
+#endif
+    {
         if (getLocalOpt) {
             dX[i] = tempDeltaX[i];
         }
@@ -1110,4 +1281,7 @@ void Projected_Newton3D(mesh3D& mesh, double &mfsum, int& total_cg_iterations, i
         mesh.vertexes[i][1] -= dX[i][1] * dt;
         mesh.vertexes[i][2] -= dX[i][2] * dt;
     }
+#ifdef USE_TBB
+    );
+#endif
 }

@@ -289,10 +289,11 @@ void fem_explicit2D(mesh2D& mesh) {
     //float sum = 0.f;
     //n++;
     //if (sqrt(sum) < 1e-4) return;
+    double gravity = -9.8;
     for (int ii = 0; ii < mesh.vertexNum; ii++) {
 
         double acx = mesh.forces[ii][0] / mesh.masses[ii];
-        double acy = mesh.forces[ii][1] / mesh.masses[ii] - 9.8;
+        double acy = mesh.forces[ii][1] / mesh.masses[ii] + gravity;
 
         mesh.forces[ii][0] = 0;
         mesh.forces[ii][1] = 0;

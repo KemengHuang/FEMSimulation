@@ -74,8 +74,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\include;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\libs\debug;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\libs\debug;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\include;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\include;$(SolutionDir)\FEM-SIMULATION\TBB\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\libs\debug;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\libs\debug;$(SolutionDir)\FEM-SIMULATION\TBB;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -83,8 +83,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\libs\release;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\libs\release;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\include;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\libs\release;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\libs\release;$(SolutionDir)\FEM-SIMULATION\TBB;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\FEM-SIMULATION\GL_LIB\glew_64\include;$(SolutionDir)\FEM-SIMULATION\GL_LIB\freeglut_64\include;$(SolutionDir)\FEM-SIMULATION\TBB\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

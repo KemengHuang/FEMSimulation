@@ -173,7 +173,7 @@ void draw_mesh2D()
 void draw_mesh3D()
 {
     glEnable(GL_DEPTH_TEST);
-    glLineWidth(0.5f);
+    glLineWidth(1.5f);
     glColor3f(0.8f, 0.1f, 0.8f);
     glBegin(GL_TRIANGLES);
     for (int i = 0; i < mesh3d.tetrahedraNum; i++) {
@@ -186,7 +186,7 @@ void draw_mesh3D()
     glEnd();
     glColor3f(0.8f, 0.8f, 0.1f);
     //glDisable(GL_DEPTH_TEST);
-    glLineWidth(0.5f);
+    glLineWidth(1.5f);
     glBegin(GL_LINES);
     double offset = 1.0;
     for (int i = 0; i < mesh3d.tetrahedraNum; i++) {
