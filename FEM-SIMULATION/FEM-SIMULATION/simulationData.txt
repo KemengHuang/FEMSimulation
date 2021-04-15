@@ -1,0 +1,3 @@
+total_time: 343.038
+total_cg_iterations: 26936
+total_newton_iterations: 32

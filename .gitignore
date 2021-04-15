@@ -7,3 +7,7 @@ FEM-SIMULATION/x64/Debug/*.pdb
 FEM-SIMULATION/x64/Release/*.exe
 FEM-SIMULATION/x64/Release/*.ilk
 FEM-SIMULATION/x64/Release/*.pdb
+FEM-SIMULATION/x64/Release/*.ipdb
+FEM-SIMULATION/x64/Release/*.iobj
+FEM-SIMULATION/x64/Debug/*.ipdb
+FEM-SIMULATION/x64/Debug/*.iobj

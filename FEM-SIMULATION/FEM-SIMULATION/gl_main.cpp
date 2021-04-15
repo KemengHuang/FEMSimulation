@@ -274,21 +274,21 @@ void display(void)
     else if (s_dimention == 3) {     
         if (isImplicit) {
             fem_implicit3D(mesh3d);
-            /*double tempS = mfsum;
-            HighResolutionTimerForWin timer;
-            timer.set_start();
-            Projected_Newton3D(mesh3d, mfsum, total_cg_iterations, total_newton_iterations);
-            timer.set_end();
-            total_time += timer.get_millisecond()/1000;
-            cout << "cost time:         "<<total_time << endl;
-            if (abs(mfsum - tempS) < 1e-3) {
-                ofstream output("simulationData.txt");
-                output << "total_time: " << total_time << endl;
-                output << "total_cg_iterations: " << total_cg_iterations << endl;
-                output << "total_newton_iterations: " << total_newton_iterations << endl;
-                output.close();
-                exit(0);
-            }*/
+            //double tempS = mfsum;
+            //HighResolutionTimerForWin timer;
+            //timer.set_start();
+            //Projected_Newton3D(mesh3d, mfsum, total_cg_iterations, total_newton_iterations);
+            //timer.set_end();
+            //total_time += timer.get_millisecond()/1000;
+            //cout << "cost time:         "<<total_time << endl;
+            //if (abs(mfsum - tempS) < 1e-3) {
+            //    ofstream output("simulationData.txt");
+            //    output << "total_time: " << total_time << endl;
+            //    output << "total_cg_iterations: " << total_cg_iterations << endl;
+            //    output << "total_newton_iterations: " << total_newton_iterations << endl;
+            //    output.close();
+            //    //exit(0);
+            //}
         }
         else {
             fem_explicit3D(mesh3d);

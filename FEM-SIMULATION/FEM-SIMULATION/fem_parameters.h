@@ -4,8 +4,8 @@
 
 namespace FEM {
 	const static double PI = 3.1415926535897932;
-	const static double density = 1;
-	const static double YoungModulus = 600.0;
+	const static double density = 0.01;
+	const static double YoungModulus = 10.0;
 	const static double PoissonRate = 0.49;
 	const static double explicit_time_step = 0.0001;
 	const static double implicit_time_step = 0.001;
