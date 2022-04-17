@@ -429,8 +429,8 @@ void Projected_Newton2D(mesh2D& mesh) {
         mesh.forces[i][0] = 0;
         mesh.forces[i][1] = 0;
         //init c
-        c[i][0] = r[i][0] * P(i * 2);
-        c[i][1] = r[i][1] * P(i * 2 + 1);
+        c[i][0] = r[i][0] / P(i * 2);
+        c[i][1] = r[i][1] / P(i * 2 + 1);
 
         deltaN += c[i][0] * r[i][0];
         deltaN += c[i][1] * r[i][1];
@@ -478,8 +478,8 @@ void Projected_Newton2D(mesh2D& mesh) {
             r[i][0] = r[i][0] - alpha * q[i][0];
             r[i][1] = r[i][1] - alpha * q[i][1];
 
-            s[i][0] = r[i][0] * P(i * 2);
-            s[i][1] = r[i][1] * P(i * 2 + 1);
+            s[i][0] = r[i][0] / P(i * 2);
+            s[i][1] = r[i][1] / P(i * 2 + 1);
 
             deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1]);
         }
@@ -594,8 +594,8 @@ void fem_implicit2D(mesh2D& mesh) {
         //mesh.forces[i][0] = 0;
         //mesh.forces[i][1] = 0;
         //init c
-        c[i][0] = r[i][0] * P(i * 2);
-        c[i][1] = r[i][1] * P(i * 2 + 1);
+        c[i][0] = r[i][0] / P(i * 2);
+        c[i][1] = r[i][1] / P(i * 2 + 1);
 
         deltaN += c[i][0] * r[i][0];
         deltaN += c[i][1] * r[i][1];
@@ -647,8 +647,8 @@ void fem_implicit2D(mesh2D& mesh) {
             r[i][0] = r[i][0] - alpha * q[i][0];
             r[i][1] = r[i][1] - alpha * q[i][1];
 
-            s[i][0] = r[i][0] * P(i * 2);
-            s[i][1] = r[i][1] * P(i * 2 + 1);
+            s[i][0] = r[i][0] / P(i * 2);
+            s[i][1] = r[i][1] / P(i * 2 + 1);
 
             deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1]);
         }

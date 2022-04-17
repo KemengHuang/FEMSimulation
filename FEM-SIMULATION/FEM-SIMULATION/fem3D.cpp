@@ -505,12 +505,35 @@ MatrixXd project_ANIOSI5_H_3D(const Matrix3d& F, Vector3d direction, const doubl
     Tz << 0, 1, 0, -1, 0, 0, 0, 0, 0;
     Vector3d directionM = V.transpose() * direction;
 
-    Tx *= 1.f / sqrt(2.f);
-    Ty *= 1.f / sqrt(2.f);
-    Tz *= 1.f / sqrt(2.f);
-
     Q1 = U * Tx * sigma * V.transpose() * A;
+
+    double MLength = 0;
+    for (int i = 0;i < 3;i++) {
+        for (int j = 0;j < 3;j++) {
+            MLength += Q1(i, j) * Q1(i, j);
+        }
+    }
+    MLength = sqrt(MLength);
+    for (int i = 0;i < 3;i++) {
+        for (int j = 0;j < 3;j++) {
+            Q1(i, j) = Q1(i, j) / MLength;
+        }
+    }
+
     Q2 = (sigma(1, 1) * directionM[1]) * U * Tz * sigma * V.transpose() * A - (sigma(2, 2) * directionM[2]) * U * Ty * sigma * V.transpose() * A;
+
+    MLength = 0;
+    for (int i = 0;i < 3;i++) {
+        for (int j = 0;j < 3;j++) {
+            MLength += Q2(i, j) * Q2(i, j);
+        }
+    }
+    MLength = sqrt(MLength);
+    for (int i = 0;i < 3;i++) {
+        for (int j = 0;j < 3;j++) {
+            Q2(i, j) = Q2(i, j) / MLength;
+        }
+    }
 
     MatrixXd H = lamda0 * vec_double(Q0) * vec_double(Q0).transpose();
     if (lamda1 > 0) {
@@ -803,7 +826,7 @@ void fem_implicit3D(mesh3D& mesh) {
     double localOptimal = DBL_MAX;
     bool getLocalOpt = false;
 
-
+    int cgCounts = 0;
     //out << fsum << endl;
     if (counter) {
         //out << fsum << endl;
@@ -893,9 +916,9 @@ void fem_implicit3D(mesh3D& mesh) {
                 for (int i = rg.begin(); i != rg.end(); i++) {
                     r[i] += b0[i];
                     r[i] = mesh.Constraints[i] * r[i];
-                    c[i][0] = r[i][0] * P(i * 3);
-                    c[i][1] = r[i][1] * P(i * 3 + 1);
-                    c[i][2] = r[i][2] * P(i * 3 + 2);
+                    c[i][0] = r[i][0] / P(i * 3);
+                    c[i][1] = r[i][1] / P(i * 3 + 1);
+                    c[i][2] = r[i][2] / P(i * 3 + 2);
                     c[i] = mesh.Constraints[i] * c[i];
 
                     temp_deltaN += c[i][0] * r[i][0];
@@ -913,9 +936,9 @@ void fem_implicit3D(mesh3D& mesh) {
         {
             r[i] += b0[i];
             r[i] = mesh.Constraints[i] * r[i];
-            c[i][0] = r[i][0] * P(i * 3);
-            c[i][1] = r[i][1] * P(i * 3 + 1);
-            c[i][2] = r[i][2] * P(i * 3 + 2);
+            c[i][0] = r[i][0] / P(i * 3);
+            c[i][1] = r[i][1] / P(i * 3 + 1);
+            c[i][2] = r[i][2] / P(i * 3 + 2);
             c[i] = mesh.Constraints[i] * c[i];
 
             deltaN += c[i][0] * r[i][0];
@@ -929,10 +952,10 @@ void fem_implicit3D(mesh3D& mesh) {
         double errorRate = 1e-6;
         std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN << endl;
         //PCG main loop
-        int cgCounts = 0;
+        
         while (deltaN > errorRate* errorRate* delta0) {
             cgCounts++;
-            std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN << "      iteration_counts:      " << cgCounts << endl;
+            //std::cout << "delta0:   " << delta0 << "      deltaN:   " << deltaN << "      iteration_counts:      " << cgCounts << endl;
             vector<Vector3d> q(mesh.vertexNum, Vector3d(0, 0, 0));
 #ifdef USE_TBB
             tbb::parallel_for(0, mesh.tetrahedraNum, 1, [&](int ii)
@@ -1012,9 +1035,9 @@ void fem_implicit3D(mesh3D& mesh) {
                         r[i][1] = r[i][1] - alpha * q[i][1];
                         r[i][2] = r[i][2] - alpha * q[i][2];
 
-                        s[i][0] = r[i][0] * P(i * 3);
-                        s[i][1] = r[i][1] * P(i * 3 + 1);
-                        s[i][2] = r[i][2] * P(i * 3 + 2);
+                        s[i][0] = r[i][0] / P(i * 3);
+                        s[i][1] = r[i][1] / P(i * 3 + 1);
+                        s[i][2] = r[i][2] / P(i * 3 + 2);
 
                         temp_deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1] + r[i][2] * s[i][2]);
                     }
@@ -1034,9 +1057,9 @@ void fem_implicit3D(mesh3D& mesh) {
                 r[i][1] = r[i][1] - alpha * q[i][1];
                 r[i][2] = r[i][2] - alpha * q[i][2];
 
-                s[i][0] = r[i][0] * P(i * 3);
-                s[i][1] = r[i][1] * P(i * 3 + 1);
-                s[i][2] = r[i][2] * P(i * 3 + 2);
+                s[i][0] = r[i][0] / P(i * 3);
+                s[i][1] = r[i][1] / P(i * 3 + 1);
+                s[i][2] = r[i][2] / P(i * 3 + 2);
 
                 deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1] + r[i][2] * s[i][2]);
             }
@@ -1073,7 +1096,7 @@ void fem_implicit3D(mesh3D& mesh) {
 #endif
         }
     }
-    //cout << "deltaN:  " << deltaN << endl;
+    cout << "cg counts:  " << cgCounts << endl;
     double gravity = -9.8;
 
 #ifdef USE_TBB
@@ -1227,9 +1250,9 @@ void Projected_Newton3D(mesh3D& mesh, double& mfsum, int& total_cg_iterations, i
         delta0 = parallel_reduce(
             tbb::blocked_range<int>(0, mesh.vertexNum), 0.0, [&](const tbb::blocked_range<int>& r, double temp_delta) {
                 for (int i = r.begin(); i != r.end(); i++) {
-                    double vx = 1 / (P(i * 3));// abs(P(i * 3)) > 1e-5 ? 1 / (P(i * 3)) : 1;
-                    double vy = 1 / (P(i * 3 + 1));// abs(P(i * 3) + 1) > 1e-5 ? 1 / (P(i * 3) + 1) : 1;
-                    double vz = 1 / (P(i * 3 + 2));// abs(P(i * 3) + 2) > 1e-5 ? 1 / (P(i * 3) + 2) : 1;
+                    double vx = 1 / (P(i * 3));
+                    double vy = 1 / (P(i * 3 + 1));
+                    double vz = 1 / (P(i * 3 + 2));
                     Vector3d filter_b = mesh.Constraints[i] * b0[i];
                     temp_delta += filter_b[0] * filter_b[0] * vx;
                     temp_delta += filter_b[1] * filter_b[1] * vy;
@@ -1259,9 +1282,9 @@ void Projected_Newton3D(mesh3D& mesh, double& mfsum, int& total_cg_iterations, i
                 for (int i = rg.begin(); i != rg.end(); i++) {
                     r[i] = b0[i];
                     r[i] = mesh.Constraints[i] * r[i];
-                    c[i][0] = r[i][0] * P(i * 3);
-                    c[i][1] = r[i][1] * P(i * 3 + 1);
-                    c[i][2] = r[i][2] * P(i * 3 + 2);
+                    c[i][0] = r[i][0] / P(i * 3);
+                    c[i][1] = r[i][1] / P(i * 3 + 1);
+                    c[i][2] = r[i][2] / P(i * 3 + 2);
                     c[i] = mesh.Constraints[i] * c[i];
 
                     temp_deltaN += c[i][0] * r[i][0];
@@ -1279,9 +1302,9 @@ void Projected_Newton3D(mesh3D& mesh, double& mfsum, int& total_cg_iterations, i
         {
             r[i] = b0[i];
             r[i] = mesh.Constraints[i] * r[i];
-            c[i][0] = r[i][0] * P(i * 3);
-            c[i][1] = r[i][1] * P(i * 3 + 1);
-            c[i][2] = r[i][2] * P(i * 3 + 2);
+            c[i][0] = r[i][0] / P(i * 3);
+            c[i][1] = r[i][1] / P(i * 3 + 1);
+            c[i][2] = r[i][2] / P(i * 3 + 2);
             c[i] = mesh.Constraints[i] * c[i];
 
             deltaN += c[i][0] * r[i][0];
@@ -1378,9 +1401,9 @@ void Projected_Newton3D(mesh3D& mesh, double& mfsum, int& total_cg_iterations, i
                         r[i][1] = r[i][1] - alpha * q[i][1];
                         r[i][2] = r[i][2] - alpha * q[i][2];
 
-                        s[i][0] = r[i][0] * P(i * 3);
-                        s[i][1] = r[i][1] * P(i * 3 + 1);
-                        s[i][2] = r[i][2] * P(i * 3 + 2);
+                        s[i][0] = r[i][0] / P(i * 3);
+                        s[i][1] = r[i][1] / P(i * 3 + 1);
+                        s[i][2] = r[i][2] / P(i * 3 + 2);
 
                         temp_deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1] + r[i][2] * s[i][2]);
                     }
@@ -1400,9 +1423,9 @@ void Projected_Newton3D(mesh3D& mesh, double& mfsum, int& total_cg_iterations, i
                 r[i][1] = r[i][1] - alpha * q[i][1];
                 r[i][2] = r[i][2] - alpha * q[i][2];
 
-                s[i][0] = r[i][0] * P(i * 3);
-                s[i][1] = r[i][1] * P(i * 3 + 1);
-                s[i][2] = r[i][2] * P(i * 3 + 2);
+                s[i][0] = r[i][0] / P(i * 3);
+                s[i][1] = r[i][1] / P(i * 3 + 1);
+                s[i][2] = r[i][2] / P(i * 3 + 2);
 
                 deltaN += (r[i][0] * s[i][0] + r[i][1] * s[i][1] + r[i][2] * s[i][2]);
             }
